@@ -7,7 +7,7 @@
   <style>
     * {
       box-sizing: border-box;
-    }
+    } 
 
     body {
       margin: 0;
@@ -17,14 +17,14 @@
     }
 
     .container {
-      max-width: 1100px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 32px 20px 60px;
     }
 
     .hero {
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .hero h1 {
@@ -38,7 +38,7 @@
       font-size: 18px;
     }
 
-    .upload-card,
+    .card,
     .panel {
       background: #1e293b;
       border: 1px solid #334155;
@@ -47,18 +47,60 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.18);
     }
 
-    .upload-card {
+    .card {
       margin-bottom: 20px;
     }
 
-    input[type="file"] {
-      display: block;
+    .info-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .info-box strong {
+      color: #e2e8f0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       border-radius: 12px;
-      border: 1px dashed #64748b;
+      border: 1px solid #475569;
       background: #0f172a;
       color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .field textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
     }
 
     .grid {
@@ -96,8 +138,9 @@
     }
 
     .stat-value {
-      font-size: 24px;
+      font-size: 21px;
       font-weight: bold;
+      line-height: 1.3;
     }
 
     #output {
@@ -108,11 +151,56 @@
       padding: 16px;
       color: #cbd5e1;
       white-space: pre-line;
-      min-height: 140px;
+      min-height: 220px;
     }
 
-    @media (max-width: 850px) {
-      .grid {
+    .calibration-box {
+      margin-top: 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .calibration-status {
+      margin-top: 10px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #e2e8f0;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #111c34;
+    }
+
+    .small-note {
+      margin-top: 12px;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 900px) {
+      .grid,
+      .form-grid {
         grid-template-columns: 1fr;
       }
 
@@ -126,11 +214,108 @@
   <div class="container">
     <div class="hero">
       <h1>SpikeCheck</h1>
-      <p>Upload a side-view volleyball hitting clip and get simple form feedback.</p>
+      <p>Upload a side-view volleyball hitting clip and get more useful form feedback.</p>
     </div>
 
-    <div class="upload-card">
-      <input type="file" id="videoInput" accept="video/*" />
+    <div class="card">
+      <div class="info-box">
+        <strong>How this works:</strong><br>
+        You can use SpikeCheck with only a video for basic form feedback.<br><br>
+        If you also enter your <strong>standing reach</strong> and <strong>net height</strong>, and then click the
+        <strong>top of the net</strong> and the <strong>floor directly below it</strong> on the video, SpikeCheck can also estimate:
+        <br>• contact reach
+        <br>• gain above standing reach
+        <br>• rough vertical/contact height estimate
+        <br><br>
+        <strong>To improve accuracy:</strong>
+        <br>• use a side-view clip
+        <br>• keep the full body visible
+        <br>• make sure the top of the net and the floor under it are visible
+        <br>• use a stable camera and decent lighting
+        <br>• keep only one hitter in frame if possible
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="videoInput">Upload video</label>
+          <input type="file" id="videoInput" accept="video/*" />
+        </div>
+
+        <div class="field">
+          <label for="hittingHand">Hitting hand</label>
+          <select id="hittingHand">
+            <option value="right">Right-handed</option>
+            <option value="left">Left-handed</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="heightFeet">Height (feet, optional)</label>
+          <input type="number" id="heightFeet" min="0" placeholder="e.g. 6" />
+        </div>
+
+        <div class="field">
+          <label for="heightInches">Height (inches, optional)</label>
+          <input type="number" id="heightInches" min="0" max="11" placeholder="e.g. 1" />
+        </div>
+
+        <div class="field">
+          <label for="reachFeet">Standing reach (feet, optional)</label>
+          <input type="number" id="reachFeet" min="0" placeholder="e.g. 7" />
+        </div>
+
+        <div class="field">
+          <label for="reachInches">Standing reach (inches, optional)</label>
+          <input type="number" id="reachInches" min="0" max="11" placeholder="e.g. 10" />
+        </div>
+
+        <div class="field">
+          <label for="netFeet">Net height (feet, optional)</label>
+          <input type="number" id="netFeet" min="0" placeholder="e.g. 7" />
+        </div>
+
+        <div class="field">
+          <label for="netInches">Net height (inches, optional)</label>
+          <input type="number" id="netInches" min="0" max="11" placeholder='e.g. 11.5 or 4' />
+        </div>
+
+        <div class="field">
+          <label for="cameraAngle">Camera angle</label>
+          <select id="cameraAngle">
+            <option value="side">Side view</option>
+            <option value="diagonal">Slight diagonal</option>
+            <option value="front">Front view</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="repType">Rep type</label>
+          <select id="repType">
+            <option value="full">Full approach hit</option>
+            <option value="controlled">Controlled approach rep</option>
+            <option value="standing">Standing hit</option>
+          </select>
+        </div>
+
+        <div class="field full-width">
+          <label for="userNotes">Optional notes / what feels off</label>
+          <textarea id="userNotes" placeholder="Example: I feel like I contact low and late."></textarea>
+        </div>
+      </div>
+
+      <div class="calibration-box">
+        <strong>Optional net calibration</strong><br>
+        If you entered a net height, you can click the button below and then click:
+        <br>1. the top of the net
+        <br>2. the floor directly below it
+        <div class="button-row">
+          <button id="startCalibrationBtn" type="button">Start Net Calibration</button>
+          <button id="resetCalibrationBtn" type="button">Reset Calibration</button>
+        </div>
+        <div class="calibration-status" id="calibrationStatus">
+          Calibration not set.
+        </div>
+      </div>
     </div>
 
     <div class="grid">
@@ -144,16 +329,39 @@
         <h2 class="results-title">Results</h2>
 
         <div class="stat">
-          <div class="stat-label">Estimated Elbow Angle</div>
+          <div class="stat-label">Elbow angle at likely contact</div>
           <div class="stat-value" id="angleValue">--</div>
         </div>
 
         <div class="stat">
-          <div class="stat-label">Estimated Contact Height</div>
+          <div class="stat-label">Arm extension score</div>
+          <div class="stat-value" id="extensionValue">--</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">Contact height score</div>
           <div class="stat-value" id="contactValue">--</div>
         </div>
 
+        <div class="stat">
+          <div class="stat-label">Estimated contact reach</div>
+          <div class="stat-value" id="reachValue">Optional: add standing reach + net calibration</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">Estimated gain above standing reach</div>
+          <div class="stat-value" id="gainValue">--</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">Estimated margin above net</div>
+          <div class="stat-value" id="netMarginValue">--</div>
+        </div>
+
         <div id="output">Model loading...</div>
+        <div class="small-note">
+          Reach / vertical-style estimates are approximate and depend heavily on camera angle, visible net reference, and input quality.
+        </div>
       </div>
     </div>
   </div>
