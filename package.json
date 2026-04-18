@@ -1,5 +1,9 @@
 {
+  "name": "spike-analyzer",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
   "dependencies": {
-    "openai": "^6.33.0"
+    "openai": "^6.4.0"
   }
 }

@@ -13,8 +13,7 @@ export default async function handler(req, res) {
       userNotes,
       elbowAngle,
       extensionScore,
-      contactHeightScore,
-      contactHeightLabel,
+      reachEfficiencyScore,
       estimatedContactReach,
       gainAboveStandingReach,
       marginAboveNet,
@@ -29,7 +28,8 @@ export default async function handler(req, res) {
 You are a clear, practical volleyball coach.
 
 Use the provided measurements as the main evidence.
-Do not invent exact timing or ball-contact facts if the app did not measure them.
+Do not invent exact timing or exact ball-contact facts if the app did not measure them.
+Do not overstate confidence.
 Be specific, concise, and useful.
 
 Return exactly this format:
@@ -41,7 +41,9 @@ Why it matters:
 <1 short paragraph>
 
 What to change:
-<2-3 specific coaching cues>
+- <cue 1>
+- <cue 2>
+- <cue 3>
 
 One drill:
 <1 short paragraph>
@@ -58,8 +60,7 @@ Here is the player's analysis data:
 
 - Elbow angle at likely contact: ${elbowAngle ?? "unknown"}
 - Extension score: ${extensionScore ?? "unknown"}/10
-- Contact height score: ${contactHeightScore ?? "unknown"}/10
-- Contact height label: ${contactHeightLabel ?? "unknown"}
+- Reach efficiency score: ${reachEfficiencyScore ?? "unknown"}/10
 
 - Estimated contact reach: ${estimatedContactReach ?? "not available"}
 - Estimated gain above standing reach: ${gainAboveStandingReach ?? "not available"}
@@ -71,7 +72,8 @@ Here is the player's analysis data:
         : "none"
     }
 
-Prioritize the single biggest issue first. If the measurement quality is limited, say that clearly.
+Prioritize the single biggest issue first.
+If measurement quality is limited, say that clearly.
 `;
 
     const response = await client.responses.create({
