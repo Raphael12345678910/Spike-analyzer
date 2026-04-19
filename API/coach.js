@@ -82,7 +82,6 @@ If measurement quality is limited, say that clearly.
     });
 
     const text = response.output_text || "No coaching feedback returned.";
-
     return res.status(200).json({ feedback: text });
   } catch (error) {
     console.error(error);

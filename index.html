@@ -17,10 +17,6 @@
       --text: #e5ecff;
       --muted: #9fb0d0;
       --accent: #4f8cff;
-      --accent-2: #7dd3fc;
-      --good: #34d399;
-      --warn: #fbbf24;
-      --bad: #f87171;
     }
 
     body {
@@ -66,17 +62,11 @@
       font-size: 22px;
     }
 
-    .subtle {
-      color: var(--muted);
-      line-height: 1.5;
-      font-size: 14px;
-    }
-
     .step-badge {
       display: inline-block;
       font-size: 12px;
       font-weight: bold;
-      color: var(--accent-2);
+      color: #7dd3fc;
       background: rgba(79, 140, 255, 0.12);
       border: 1px solid rgba(79, 140, 255, 0.35);
       padding: 5px 9px;
@@ -134,15 +124,6 @@
       cursor: pointer;
       background: var(--accent);
       color: white;
-      transition: transform 0.08s ease, opacity 0.15s ease;
-    }
-
-    button:hover {
-      opacity: 0.95;
-    }
-
-    button:active {
-      transform: translateY(1px);
     }
 
     button.secondary {
@@ -248,17 +229,6 @@
       line-height: 1.5;
     }
 
-    .status-good { color: var(--good); }
-    .status-warn { color: var(--warn); }
-    .status-bad { color: var(--bad); }
-
-    .mini-list {
-      margin: 8px 0 0 16px;
-      color: var(--muted);
-      line-height: 1.45;
-      font-size: 14px;
-    }
-
     @media (max-width: 920px) {
       .top-grid,
       .form-grid,
@@ -282,14 +252,15 @@
     <div class="hero">
       <h1>SpikeCheck</h1>
       <p>
-        A cleaner spike analysis tool: upload a side-view clip, run the analysis, then ask the AI coach to interpret the numbers.
-        Optional standing reach and net height can help with rough estimates, but those estimates are still approximate.
+        Upload a side-view clip, run analysis, then ask the AI coach to interpret the numbers.
+        Standing reach and net height are optional.
       </p>
     </div>
 
     <div class="card">
       <div class="step-badge">STEP 1</div>
       <h2 class="section-title">Upload and preview your clip</h2>
+
       <div class="top-grid">
         <div>
           <div class="video-shell">
@@ -305,13 +276,14 @@
           </div>
 
           <div class="hint">
-            Best results: side view, full body visible, one hitter in frame, stable camera, decent lighting.
+            Best results: side view, full body visible, stable camera, decent lighting.
           </div>
         </div>
 
         <div>
           <div class="step-badge">STEP 2</div>
           <h2 class="section-title">Optional player info</h2>
+
           <div class="form-grid">
             <div class="field">
               <label for="hittingHand">Hitting hand</label>
@@ -354,10 +326,6 @@
               <textarea id="userNotes" placeholder="Example: I feel like I contact low or my arm collapses."></textarea>
             </div>
           </div>
-
-          <div class="hint">
-            These optional fields do not magically make the app precise. They just make the output more grounded.
-          </div>
         </div>
       </div>
     </div>
@@ -384,22 +352,22 @@
 
         <div class="metric">
           <div class="metric-label">Estimated contact reach</div>
-          <div class="metric-value" id="contactReachValue">--</div>
+          <div class="metric-value" id="contactReachValue">Disabled for now</div>
         </div>
 
         <div class="metric">
           <div class="metric-label">Estimated gain above standing reach</div>
-          <div class="metric-value" id="gainValue">--</div>
+          <div class="metric-value" id="gainValue">Disabled for now</div>
         </div>
 
         <div class="metric">
           <div class="metric-label">Estimated margin above net</div>
-          <div class="metric-value" id="netMarginValue">--</div>
+          <div class="metric-value" id="netMarginValue">Disabled for now</div>
         </div>
 
         <div class="metric wide">
           <div class="metric-label">System notes</div>
-          <div class="big-text-box" id="systemOutput">No analysis yet.</div>
+          <div class="big-text-box" id="systemOutput">Model loading...</div>
         </div>
       </div>
     </div>
@@ -407,12 +375,11 @@
     <div class="card">
       <div class="step-badge">STEP 4</div>
       <h2 class="section-title">AI Coach</h2>
+
       <div class="button-row">
         <button id="aiBtn" disabled>Get AI Coaching</button>
       </div>
-      <div class="hint">
-        This uses the measured numbers as input. If the measurements are weak, the coaching will still be limited.
-      </div>
+
       <div class="big-text-box ai-box" id="aiCoach">
         Run the analysis first, then click “Get AI Coaching.”
       </div>
