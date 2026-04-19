@@ -101,8 +101,10 @@
       border: 1px solid var(--border);
     }
 
-    video,
-    canvas {
+    #video,
+    #overlayCanvas {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: block;
@@ -114,8 +116,6 @@
     }
 
     #overlayCanvas {
-      position: absolute;
-      inset: 0;
       pointer-events: none;
     }
 
@@ -166,6 +166,10 @@
       border-radius: 12px;
       padding: 11px 12px;
       font-size: 14px;
+    }
+
+    #videoInput {
+      margin-top: 12px;
     }
 
     textarea {
@@ -293,8 +297,9 @@
             <canvas id="overlayCanvas"></canvas>
           </div>
 
+          <input type="file" id="videoInput" accept="video/*" />
+
           <div class="button-row">
-            <input type="file" id="videoInput" accept="video/*" />
             <button id="analyzeBtn">Analyze Video</button>
             <button id="resetBtn" class="secondary">Reset</button>
           </div>

@@ -110,16 +110,30 @@ function pickPeakReachFrame(frames) {
 function pickLikelyContactFrame(frames) {
   if (!frames.length) return null;
 
-  const sorted = [...frames].sort((a, b) => b.armRaisedScore - a.armRaisedScore);
-  const top = sorted.slice(0, Math.min(5, sorted.length));
+  const peakReachFrame = pickPeakReachFrame(frames);
+  if (!peakReachFrame) return null;
 
-  top.sort((a, b) => {
-    const aScore = a.armRaisedScore + (a.elbowAngle / 500);
-    const bScore = b.armRaisedScore + (b.elbowAngle / 500);
+  const candidates = frames.filter((f) => {
+    return f.armRaisedScore >= peakReachFrame.armRaisedScore * 0.88;
+  });
+
+  if (!candidates.length) return peakReachFrame;
+
+  candidates.sort((a, b) => {
+    const aScore =
+      (a.armRaisedScore * 0.55) +
+      ((a.elbowAngle || 0) * 0.25) +
+      ((a.shoulder.y < peakReachFrame.shoulder.y ? 1 : 0) * 0.2);
+
+    const bScore =
+      (b.armRaisedScore * 0.55) +
+      ((b.elbowAngle || 0) * 0.25) +
+      ((b.shoulder.y < peakReachFrame.shoulder.y ? 1 : 0) * 0.2);
+
     return bScore - aScore;
   });
 
-  return top[0];
+  return candidates[0];
 }
 
 function estimateContactReach(standingReach, reachEfficiencyScore, extensionScore, repType) {
@@ -150,7 +164,9 @@ function buildSystemNotes({
   netHeight,
   framesCount,
   extensionScore,
-  reachEfficiencyScore
+  reachEfficiencyScore,
+  contactTime,
+  peakTime
 }) {
   const lines = [];
 
@@ -175,10 +191,18 @@ function buildSystemNotes({
   }
 
   if (reachEfficiencyScore !== null && reachEfficiencyScore <= 5) {
-    lines.push("Main reach flag: the likely contact frame is well below this clip’s peak reachable frame.");
+    lines.push("Main reach flag: likely contact is well below this clip’s peak reachable frame.");
   }
 
   lines.push("No ball tracking yet. Likely contact frame is estimated, not confirmed.");
+
+  if (isFinite(contactTime)) {
+    lines.push(`Likely contact frame time: ${round1(contactTime)}s`);
+  }
+
+  if (isFinite(peakTime)) {
+    lines.push(`Peak reach frame time: ${round1(peakTime)}s`);
+  }
 
   return lines.join("\n");
 }
@@ -499,7 +523,9 @@ async function analyzeVideo() {
       netHeight,
       framesCount: smoothed.length,
       extensionScore,
-      reachEfficiencyScore
+      reachEfficiencyScore,
+      contactTime: lastAnalyzed.contactTime,
+      peakTime: lastAnalyzed.peakTime
     });
 
     aiBtn.disabled = false;
@@ -515,13 +541,45 @@ async function analyzeVideo() {
 
 function drawFrame(landmarks) {
   ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  ctx.drawImage(video, 0, 0, overlayCanvas.width, overlayCanvas.height);
 
-  drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-    lineWidth: 3
-  });
+  const canvasW = overlayCanvas.width;
+  const canvasH = overlayCanvas.height;
+  const videoW = video.videoWidth;
+  const videoH = video.videoHeight;
 
-  drawingUtils.drawLandmarks(landmarks, {
+  const videoAspect = videoW / videoH;
+  const canvasAspect = canvasW / canvasH;
+
+  let drawW, drawH, offsetX, offsetY;
+
+  if (videoAspect > canvasAspect) {
+    drawW = canvasW;
+    drawH = canvasW / videoAspect;
+    offsetX = 0;
+    offsetY = (canvasH - drawH) / 2;
+  } else {
+    drawH = canvasH;
+    drawW = canvasH * videoAspect;
+    offsetY = 0;
+    offsetX = (canvasW - drawW) / 2;
+  }
+
+  ctx.drawImage(video, offsetX, offsetY, drawW, drawH);
+
+  const transformedLandmarks = landmarks.map((lm) => ({
+    x: offsetX + lm.x * drawW,
+    y: offsetY + lm.y * drawH,
+    z: lm.z,
+    visibility: lm.visibility
+  }));
+
+  drawingUtils.drawConnectors(
+    transformedLandmarks,
+    PoseLandmarker.POSE_CONNECTIONS,
+    { lineWidth: 3 }
+  );
+
+  drawingUtils.drawLandmarks(transformedLandmarks, {
     radius: 4
   });
 }
