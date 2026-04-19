@@ -334,15 +334,24 @@ aiBtn.addEventListener("click", async () => {
 });
 
 async function analyzeVideo() {
+  if (!video.src) {
+    systemOutput.textContent = "Upload a video first.";
+    return;
+  }
+
+  if (!poseLandmarker) {
+    systemOutput.textContent = "Pose model is still loading.";
+    return;
+  }
+
   video.pause();
-  video.currentTime = 0;
 
   await new Promise((resolve) => {
     if (video.readyState >= 2) {
       resolve();
-      return;
+    } else {
+      video.onloadeddata = () => resolve();
     }
-    video.onloadeddata = () => resolve();
   });
 
   overlayCanvas.width = video.videoWidth;
@@ -355,128 +364,153 @@ async function analyzeVideo() {
   const wristIndex = hand === "left" ? 15 : 16;
 
   const duration = video.duration;
-  const sampleRate = 18;
+  const sampleRate = 12;
 
-  for (let t = 0; t < duration; t += 1 / sampleRate) {
-    video.currentTime = Math.min(t, duration);
+  async function seekTo(time) {
+    return new Promise((resolve) => {
+      const target = Math.max(0.01, Math.min(time, duration - 0.001));
 
-    await new Promise((resolve) => {
-      video.onseeked = () => resolve();
-    });
+      if (Math.abs(video.currentTime - target) < 0.01) {
+        resolve();
+        return;
+      }
 
-    const result = poseLandmarker.detectForVideo(video, performance.now());
+      const handler = () => {
+        video.removeEventListener("seeked", handler);
+        resolve();
+      };
 
-    if (!result.landmarks || !result.landmarks.length) continue;
-
-    const landmarks = result.landmarks[0];
-    const shoulder = landmarks[shoulderIndex];
-    const elbow = landmarks[elbowIndex];
-    const wrist = landmarks[wristIndex];
-
-    if (!shoulder || !elbow || !wrist) continue;
-
-    const elbowAngle = angleBetweenThreePoints(shoulder, elbow, wrist);
-    const armRaisedScore = getArmRaisedScore(shoulder, wrist);
-
-    frames.push({
-      time: t,
-      shoulder,
-      elbow,
-      wrist,
-      elbowAngle,
-      armRaisedScore,
-      landmarks
+      video.addEventListener("seeked", handler, { once: true });
+      video.currentTime = target;
     });
   }
 
-  if (frames.length < 5) {
-    systemOutput.textContent = "Could not detect enough body frames. Try a cleaner side-view clip.";
-    return;
-  }
+  try {
+    systemOutput.textContent = "Analyzing clip...";
 
-  const smoothed = smoothFrames(frames, 2);
-  const peakFrame = pickPeakReachFrame(smoothed);
-  const contactFrame = pickLikelyContactFrame(smoothed);
+    await seekTo(0.01);
 
-  if (!peakFrame || !contactFrame) {
-    systemOutput.textContent = "Could not identify a usable reach/contact frame.";
-    return;
-  }
+    for (let t = 0.01; t < duration; t += 1 / sampleRate) {
+      await seekTo(t);
 
-  const extensionScore = getExtensionScore(contactFrame.elbowAngle);
+      const result = poseLandmarker.detectForVideo(video, performance.now());
 
-  let reachEfficiencyScore = null;
-  if (peakFrame.armRaisedScore > 0) {
-    reachEfficiencyScore = clamp(
-      Math.round((contactFrame.armRaisedScore / peakFrame.armRaisedScore) * 10),
-      1,
-      10
+      if (!result.landmarks || !result.landmarks.length) continue;
+
+      const landmarks = result.landmarks[0];
+      const shoulder = landmarks[shoulderIndex];
+      const elbow = landmarks[elbowIndex];
+      const wrist = landmarks[wristIndex];
+
+      if (!shoulder || !elbow || !wrist) continue;
+
+      const elbowAngle = angleBetweenThreePoints(shoulder, elbow, wrist);
+      const armRaisedScore = getArmRaisedScore(shoulder, wrist);
+
+      frames.push({
+        time: t,
+        shoulder,
+        elbow,
+        wrist,
+        elbowAngle,
+        armRaisedScore,
+        landmarks
+      });
+    }
+
+    if (frames.length < 5) {
+      systemOutput.textContent = "Could not detect enough body frames. Try a cleaner side-view clip.";
+      return;
+    }
+
+    const smoothed = smoothFrames(frames, 2);
+    const peakFrame = pickPeakReachFrame(smoothed);
+    const contactFrame = pickLikelyContactFrame(smoothed);
+
+    if (!peakFrame || !contactFrame) {
+      systemOutput.textContent = "Could not identify a usable reach/contact frame.";
+      return;
+    }
+
+    const extensionScore = getExtensionScore(contactFrame.elbowAngle);
+
+    let reachEfficiencyScore = null;
+    if (peakFrame.armRaisedScore > 0) {
+      reachEfficiencyScore = clamp(
+        Math.round((contactFrame.armRaisedScore / peakFrame.armRaisedScore) * 10),
+        1,
+        10
+      );
+    }
+
+    const standingReach = Number(standingReachInput.value) || null;
+    const netHeight = Number(netHeightInput.value) || null;
+    const reachEstimate = estimateContactReach(
+      standingReach,
+      reachEfficiencyScore,
+      extensionScore,
+      repTypeInput.value
     );
+
+    const estimatedContactReach = reachEstimate ? reachEstimate.estimatedContactReach : null;
+    const gainAboveStandingReach = reachEstimate ? reachEstimate.gainAboveStandingReach : null;
+    const marginAboveNet =
+      reachEstimate && netHeight ? round1(reachEstimate.estimatedContactReach - netHeight) : null;
+
+    lastAnalyzed = {
+      elbowAngle: contactFrame.elbowAngle,
+      extensionScore,
+      reachEfficiencyScore,
+      estimatedContactReach,
+      gainAboveStandingReach,
+      marginAboveNet,
+      contactTime: contactFrame.time,
+      peakTime: peakFrame.time
+    };
+
+    angleValue.textContent = lastAnalyzed.elbowAngle !== null
+      ? `${round1(lastAnalyzed.elbowAngle)}°`
+      : "--";
+
+    extensionValue.textContent = extensionScore !== null
+      ? `${extensionScore}/10`
+      : "--";
+
+    reachEfficiencyValue.textContent = reachEfficiencyScore !== null
+      ? `${reachEfficiencyScore}/10`
+      : "--";
+
+    contactReachValue.textContent = estimatedContactReach !== null
+      ? inchesToFeetString(estimatedContactReach)
+      : "Need standing reach";
+
+    gainValue.textContent = gainAboveStandingReach !== null
+      ? `+${round1(gainAboveStandingReach)} in`
+      : "Need standing reach";
+
+    netMarginValue.textContent = marginAboveNet !== null
+      ? `${marginAboveNet >= 0 ? "+" : ""}${round1(marginAboveNet)} in`
+      : "Need net height";
+
+    systemOutput.textContent = buildSystemNotes({
+      cameraAngle: cameraAngleInput.value,
+      repType: repTypeInput.value,
+      standingReach,
+      netHeight,
+      framesCount: smoothed.length,
+      extensionScore,
+      reachEfficiencyScore
+    });
+
+    aiBtn.disabled = false;
+
+    await seekTo(contactFrame.time);
+    drawFrame(contactFrame.landmarks);
+
+  } catch (error) {
+    console.error(error);
+    systemOutput.textContent = "Analysis failed. Open the browser console and send me the error.";
   }
-
-  const standingReach = Number(standingReachInput.value) || null;
-  const netHeight = Number(netHeightInput.value) || null;
-  const reachEstimate = estimateContactReach(
-    standingReach,
-    reachEfficiencyScore,
-    extensionScore,
-    repTypeInput.value
-  );
-
-  const estimatedContactReach = reachEstimate ? reachEstimate.estimatedContactReach : null;
-  const gainAboveStandingReach = reachEstimate ? reachEstimate.gainAboveStandingReach : null;
-  const marginAboveNet =
-    reachEstimate && netHeight ? round1(reachEstimate.estimatedContactReach - netHeight) : null;
-
-  lastAnalyzed = {
-    elbowAngle: contactFrame.elbowAngle,
-    extensionScore,
-    reachEfficiencyScore,
-    estimatedContactReach,
-    gainAboveStandingReach,
-    marginAboveNet,
-    contactTime: contactFrame.time,
-    peakTime: peakFrame.time
-  };
-
-  angleValue.textContent = lastAnalyzed.elbowAngle !== null
-    ? `${round1(lastAnalyzed.elbowAngle)}°`
-    : "--";
-
-  extensionValue.textContent = extensionScore !== null
-    ? `${extensionScore}/10`
-    : "--";
-
-  reachEfficiencyValue.textContent = reachEfficiencyScore !== null
-    ? `${reachEfficiencyScore}/10`
-    : "--";
-
-  contactReachValue.textContent = estimatedContactReach !== null
-    ? inchesToFeetString(estimatedContactReach)
-    : "Need standing reach";
-
-  gainValue.textContent = gainAboveStandingReach !== null
-    ? `+${round1(gainAboveStandingReach)} in`
-    : "Need standing reach";
-
-  netMarginValue.textContent = marginAboveNet !== null
-    ? `${marginAboveNet >= 0 ? "+" : ""}${round1(marginAboveNet)} in`
-    : "Need net height";
-
-  systemOutput.textContent = buildSystemNotes({
-    cameraAngle: cameraAngleInput.value,
-    repType: repTypeInput.value,
-    standingReach,
-    netHeight,
-    framesCount: smoothed.length,
-    extensionScore,
-    reachEfficiencyScore
-  });
-
-  aiBtn.disabled = false;
-
-  video.currentTime = contactFrame.time;
-  drawFrame(contactFrame.landmarks);
 }
 
 function drawFrame(landmarks) {
