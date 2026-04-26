@@ -6,6 +6,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        error: "Missing OPENAI_API_KEY environment variable."
+      });
+    }
+
     const {
       hittingHand,
       cameraAngle,
@@ -27,10 +33,9 @@ export default async function handler(req, res) {
     const prompt = `
 You are a clear, practical volleyball coach.
 
-Use the provided measurements as the main evidence.
-Do not invent exact timing or exact ball-contact facts if the app did not measure them.
-Do not overstate confidence.
-Be specific, concise, and useful.
+Use the provided measurements as evidence, but do not pretend they are perfect.
+Do not invent exact ball-contact timing because the app does not track the ball yet.
+If a metric seems weak or limited, say so directly.
 
 Return exactly this format:
 
@@ -51,14 +56,14 @@ One drill:
 Confidence / limitations:
 <1 short paragraph>
 
-Here is the player's analysis data:
+Player analysis data:
 
 - Hitting hand: ${hittingHand ?? "unknown"}
 - Camera angle: ${cameraAngle ?? "unknown"}
 - Rep type: ${repType ?? "unknown"}
 - User notes: ${userNotes ?? "none"}
 
-- Elbow angle at likely contact: ${elbowAngle ?? "unknown"}
+- Elbow angle near likely contact: ${elbowAngle ?? "unknown"}
 - Extension score: ${extensionScore ?? "unknown"}/10
 - Reach efficiency score: ${reachEfficiencyScore ?? "unknown"}/10
 
@@ -71,20 +76,18 @@ Here is the player's analysis data:
         ? warnings.join(", ")
         : "none"
     }
-
-Prioritize the single biggest issue first.
-If measurement quality is limited, say that clearly.
 `;
 
     const response = await client.responses.create({
-      model: "gpt-5.4-mini",
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       input: prompt
     });
 
-    const text = response.output_text || "No coaching feedback returned.";
-    return res.status(200).json({ feedback: text });
+    return res.status(200).json({
+      feedback: response.output_text || "No coaching feedback returned."
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Coach API error:", error);
     return res.status(500).json({
       error: "Failed to generate coaching feedback."
     });

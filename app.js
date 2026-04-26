@@ -35,6 +35,21 @@ let frames = [];
 let lastAnalyzed = null;
 let currentVideoUrl = null;
 let latestLandmarks = null;
+let analysisFrameId = null;
+
+const poseConnections = [
+  [0, 1], [1, 2], [2, 3], [3, 7],
+  [0, 4], [4, 5], [5, 6], [6, 8],
+  [9, 10],
+  [11, 12],
+  [11, 13], [13, 15],
+  [12, 14], [14, 16],
+  [11, 23], [12, 24],
+  [23, 24],
+  [23, 25], [25, 27], [27, 29], [29, 31],
+  [24, 26], [26, 28], [28, 30], [30, 32],
+  [27, 31], [28, 32]
+];
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
@@ -61,7 +76,7 @@ function angle(a, b, c) {
 }
 
 function extensionScore(a) {
-  if (!a) return null;
+  if (!Number.isFinite(a)) return null;
   return clamp(Math.round((a - 120) / 6), 1, 10);
 }
 
@@ -98,8 +113,6 @@ function drawFrame(landmarks) {
     ox = (cw - w) / 2;
   }
 
-  ctx.drawImage(video, ox, oy, w, h);
-
   const pts = landmarks.map((l) => ({
     x: ox + l.x * w,
     y: oy + l.y * h,
@@ -107,35 +120,34 @@ function drawFrame(landmarks) {
     visibility: l.visibility
   }));
 
-  drawingUtils.drawConnectors(pts, PoseLandmarker.POSE_CONNECTIONS, {
-    lineWidth: 3
-  });
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#22c55e";
+  ctx.fillStyle = "#f97316";
 
-  drawingUtils.drawLandmarks(pts, {
-    radius: 4
-  });
-}
+  for (const [start, end] of poseConnections) {
+    const a = pts[start];
+    const b = pts[end];
+    if (!a || !b) continue;
 
-function renderLoop() {
-  if (!isAnalyzing) return;
-
-  const result = poseLandmarker.detectForVideo(video, performance.now());
-
-  if (result.landmarks && result.landmarks.length > 0) {
-    latestLandmarks = result.landmarks[0];
-    drawFrame(latestLandmarks);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
   }
 
-  requestAnimationFrame(renderLoop);
+  for (const point of pts) {
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
-function captureFrames() {
+function analyzeFrameLoop() {
   if (!isAnalyzing) return;
-
-  if (video.ended) {
-    finishAnalysis();
-    return;
-  }
 
   const result = poseLandmarker.detectForVideo(video, performance.now());
 
@@ -158,25 +170,50 @@ function captureFrames() {
         lm
       });
     }
+
+    latestLandmarks = lm;
+    drawFrame(lm);
   }
 
-  requestAnimationFrame(captureFrames);
+  if (video.ended || video.paused) {
+    finishAnalysis();
+    return;
+  }
+
+  analysisFrameId = requestAnimationFrame(analyzeFrameLoop);
 }
 
 function finishAnalysis() {
+  if (!isAnalyzing) return;
+
   isAnalyzing = false;
   video.pause();
+
+  if (analysisFrameId) {
+    cancelAnimationFrame(analysisFrameId);
+    analysisFrameId = null;
+  }
 
   if (frames.length < 10) {
     systemOutput.textContent = "Not enough frames. Try a cleaner side-view clip.";
     return;
   }
 
-  const peak = [...frames].sort((a, b) => b.h - a.h)[0];
+  const usableFrames = frames.filter((f) => Number.isFinite(f.ang) && Number.isFinite(f.h));
 
-  const contactCandidates = frames.filter((f) => f.h > peak.h * 0.9);
+  if (usableFrames.length < 10) {
+    systemOutput.textContent = "Pose was detected, but not enough reliable arm frames were found. Try a clearer clip.";
+    return;
+  }
 
-  const contact = (contactCandidates.length ? contactCandidates : frames)
+  const peak = [...usableFrames].sort((a, b) => b.h - a.h)[0];
+
+  const contactCandidates = usableFrames.filter((f) => (
+    f.h > peak.h * 0.9 &&
+    f.ang > 130
+  ));
+
+  const contact = (contactCandidates.length ? contactCandidates : usableFrames)
     .sort((a, b) => (b.h + b.ang / 10) - (a.h + a.ang / 10))[0];
 
   const ext = extensionScore(contact.ang);
@@ -231,6 +268,12 @@ function resetUI() {
   aiBtn.disabled = true;
 
   isAnalyzing = false;
+
+  if (analysisFrameId) {
+    cancelAnimationFrame(analysisFrameId);
+    analysisFrameId = null;
+  }
+
   frames = [];
   lastAnalyzed = null;
   latestLandmarks = null;
@@ -293,12 +336,17 @@ analyzeBtn.addEventListener("click", async () => {
 
   isAnalyzing = true;
   video.currentTime = 0;
-  video.play();
 
   systemOutput.textContent = "Analyzing... watch the skeleton overlay.";
 
-  renderLoop();
-  captureFrames();
+  try {
+    await video.play();
+    analysisFrameId = requestAnimationFrame(analyzeFrameLoop);
+  } catch (error) {
+    console.error(error);
+    isAnalyzing = false;
+    systemOutput.textContent = "Could not play the video for analysis. Try clicking the video once, then Analyze again.";
+  }
 });
 
 aiBtn.addEventListener("click", async () => {
@@ -331,10 +379,15 @@ aiBtn.addEventListener("click", async () => {
     });
 
     const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Coach backend failed.");
+    }
+
     aiCoach.textContent = data.feedback || "No response.";
   } catch (err) {
     console.error(err);
-    aiCoach.textContent = "AI failed.";
+    aiCoach.textContent = `AI failed: ${err.message}`;
   }
 });
 
