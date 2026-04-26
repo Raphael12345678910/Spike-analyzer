@@ -122,8 +122,8 @@ function drawFrame(landmarks) {
 
   ctx.save();
   ctx.lineWidth = 4;
-  ctx.strokeStyle = "#22c55e";
-  ctx.fillStyle = "#f97316";
+  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ffffff";
 
   for (const [start, end] of poseConnections) {
     const a = pts[start];
@@ -378,7 +378,18 @@ aiBtn.addEventListener("click", async () => {
       })
     });
 
-    const data = await res.json();
+    const rawText = await res.text();
+    let data;
+
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      throw new Error(
+        rawText.toLowerCase().includes("page could not be found")
+          ? "The /api/coach route was not found on Vercel. Check that the folder is named api, then commit, push, and redeploy."
+          : `Backend returned non-JSON: ${rawText.slice(0, 80)}`
+      );
+    }
 
     if (!res.ok) {
       throw new Error(data.error || "Coach backend failed.");
