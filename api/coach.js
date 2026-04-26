@@ -88,8 +88,15 @@ Player analysis data:
     });
   } catch (error) {
     console.error("Coach API error:", error);
+
+    const status = error?.status || error?.code || "unknown";
+    const message =
+      error?.message ||
+      error?.error?.message ||
+      "Unknown OpenAI API error.";
+
     return res.status(500).json({
-      error: "Failed to generate coaching feedback."
+      error: `OpenAI request failed (${status}): ${message}`
     });
   }
 }
